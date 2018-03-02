@@ -113,9 +113,7 @@ class OpenStackController(object):
                 prt = port.to_dict()
                 for fixed_ip in prt['fixed_ips']:
                     if fixed_ip['ip_address'] == ip:
-                        print 'setting now'
                         self.conn.network.update_port(port, qos_policy_id=pol['id'])
-                        print 'set'
                         updated = True
 
         if updated:
