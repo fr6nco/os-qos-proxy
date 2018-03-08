@@ -70,41 +70,11 @@ class OpenStackController(object):
         return policies
 
     def getPolicy(self, name):
-        return self.conn.network.find_qos_policy(name+"_policy")
+        return self.conn.network.find_qos_policy("osproxy_" + name + "_policy")
 
-
-    def createPolicy(self, policy):
-        listpolicy = self.conn.network.find_qos_policy(name_or_id=policy['name']+"_policy")
-        if not listpolicy:
-            qpolicy = self.conn.network.create_qos_policy(name=policy['name']+ "_policy", description="Sets Bandwidth Limit, Orchestrated by OS proxy")
-            rule = self.conn.network.create_qos_bandwidth_limit_rule(qos_policy=qpolicy, type='bandwidth_limit', direction='egress', max_burst_kbps=0, max_kbps=policy['bw'])
-            qpolicy = self.conn.network.get_qos_policy(qpolicy)
-            return qpolicy.to_dict()
-        else:
-            return listpolicy.to_dict()
-
-    def deletePolicy(self, name):
-        qpolicy = self.conn.network.find_qos_policy(name_or_id=name+"_policy")
-        if qpolicy:
-            try:
-                self.conn.network.delete_qos_policy(qpolicy)
-            except Exception as e:
-                str(e)
-                return False
-            return True
-        else:
-            return False
-
-    def assignPolicyToServer(self, ip, policy):
-        updated = False
-
-        policyobj = self.getPolicy(policy)
-        pol = policyobj.to_dict()
-
-        print policyobj
-
-        if not policyobj:
-            return None
+    def assignPolicyToServer(self, policy):
+        qpolicy = self.conn.network.create_qos_policy(name="osproxy_" + policy['name'] + "_policy", description="Policy assigned to server "+policy['name']+", Orchestrated by OS proxy")
+        qos = qpolicy.to_dict()
 
         for server in self.conn.compute.servers():
             for interface in self.conn.compute.server_interfaces(server=server):
@@ -112,14 +82,54 @@ class OpenStackController(object):
                 port = self.conn.network.get_port(iface['port_id'])
                 prt = port.to_dict()
                 for fixed_ip in prt['fixed_ips']:
-                    if fixed_ip['ip_address'] == ip:
-                        self.conn.network.update_port(port, qos_policy_id=pol['id'])
-                        updated = True
+                    if fixed_ip['ip_address'] == policy['ip']:
+                        self.conn.network.update_port(port, qos_policy_id=qos['id'])
 
-        if updated:
-            return self.listServers(filter_ip=ip)
-        else:
-            return None
+        return qpolicy.to_dict()
+
+    def deletePolicy(self, name):
+        for qpolicy in self.conn.network.qos_policies(name="osproxy_" + name + "_policy"):
+            pol = qpolicy.to_dict()
+            self.unassingPolicyFromEverywhere(policy_id=pol['id'])
+            self.conn.network.delete_qos_policy(qpolicy)
+
+        return True
+
+    def findRuleQuery(self, policy, action_type):
+        if action_type == 'bw':
+            return self.conn.network.qos_bandwidth_limit_rules(policy)
+
+    def deleteRule(self, policy, action_type, rule):
+        if action_type == 'bw':
+            self.conn.network.delete_qos_bandwidth_limit_rule(qos_rule=rule, qos_policy=policy)
+
+    def addRule(self, policy, **kwargs):
+        if kwargs['type'] == 'bw':
+            self.conn.network.create_qos_bandwidth_limit_rule(qos_policy=policy, type='bandwidth_limit',
+                                                              direction=kwargs['direction'],
+                                                              max_burst_kbps=kwargs['max_burst_kbps'],
+                                                              max_kbps=kwargs['max_kbps'])
+
+    def executeRuleOnPolicy(self, policy_name, rule):
+        policyobj = self.getPolicy(policy_name)
+        rule['direction'] = 'egress' if rule['direction'] == 'incoming' else 'ingress'
+
+        for obj in self.findRuleQuery(policy=policyobj, action_type=rule['type']):
+            objdict = obj.to_dict()
+            if objdict['direction'] == rule['direction']:
+                self.deleteRule(policy=policyobj, action_type=rule['type'], rule=obj)
+
+        if rule['action'] == 'add':
+            self.addRule(policy=policyobj, **rule)
+
+        return self.getPolicy(policy_name).to_dict()
+
+    def unassingPolicyFromEverywhere(self, policy_id):
+        for port in self.conn.network.ports():
+            por = port.to_dict()
+            if por['qos_policy_id'] == policy_id:
+                self.conn.network.update_port(port, qos_policy_id=None)
+
 
     def unassignPolicyFromServer(self, ip):
         for server in self.conn.compute.servers():

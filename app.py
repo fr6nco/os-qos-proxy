@@ -9,10 +9,18 @@ monkey.patch_all()
 app = Flask(__name__)
 api = Api(app)
 
+#DONE
 api.add_resource(qos, '/api/qos')
-api.add_resource(qosPolicy, '/api/qos/policy')
-api.add_resource(qosPolicyDetail, '/api/qos/policy/<string:name>')
+
+#DONE
 api.add_resource(qosDetail, '/api/qos/<string:ip_address>')
+
+#DONE
+api.add_resource(qosPolicy, '/api/qos/policy')
+
+#DONE
+api.add_resource(qosPolicyDetail, '/api/qos/policy/<string:name>')
+
 
 if __name__ == '__main__':
     app.run(debug=False)

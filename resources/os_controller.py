@@ -4,9 +4,6 @@ from modules.openstack_controller.controller import OpenStackController
 import logging
 LOGGER = logging.getLogger(__name__)
 
-RULE_NAME_PREFIX = "osproxy_"
-
-
 ## this is not really needed anymore. We can marshall with server_resource_fields if needed
 rule_resource_fields = {
     'qos_policy_id': fields.String,
@@ -53,50 +50,47 @@ class qos(Resource):
 
 qosDetailParser = reqparse.RequestParser()
 qosDetailParser.add_argument('policy', type=str, required=True, help='Please Define Policy name, osproxy_{name}_policy are prepended and appended automatically')
+qosDetailParser.add_argument('direction', type=str, required=False, help='Add direction if required')
+
 
 class qosDetail(Resource):
     def get(self, ip_address):
         return OSController.listServers(filter_ip=ip_address)
 
-    def post(self, ip_address):
-        policy = qosDetailParser.parse_args()
-        res = OSController.assignPolicyToServer(ip_address, RULE_NAME_PREFIX + policy['policy'])
-
-        if res:
-            return res
-        else:
-            abort(400, message='Failed to assign policy ' + RULE_NAME_PREFIX + policy['policy'] +'_policy on IP ' + ip_address)
-
-    def delete(self, ip_address):
-
-        res = OSController.unassignPolicyFromServer(ip_address)
-
-        if res:
-            return res
-        else:
-            abort(400, message='Failed to unassign policy')
-
-
 
 qosPolicyParser = reqparse.RequestParser()
-qosPolicyParser.add_argument('name', type=str, required=True, help='Name required')
-qosPolicyParser.add_argument('bw', type=int, required=True, help='BW must be integer in kbps')
-
+qosPolicyParser.add_argument('name', type=str, required=True, help='Hostname required')
+qosPolicyParser.add_argument('ip', type=str, required=True, help='IP address required')
 
 class qosPolicy(Resource):
     def get(self):
         return OSController.listOrchestratorPolicies()
 
-
     def post(self):
         policy = qosPolicyParser.parse_args()
-        policy['name'] = RULE_NAME_PREFIX + policy['name']
-        return OSController.createPolicy(policy)
+        return OSController.assignPolicyToServer(policy)
+
+
+qosPolicyRuleParser = reqparse.RequestParser()
+qosPolicyRuleParser.add_argument('action', type=str, required=True, help='Provide action, add or delete')
+qosPolicyRuleParser.add_argument('type', type=str, required=True, help='Provide Rule Type. Currently only BW is supported for bandwidth limit')
+qosPolicyRuleParser.add_argument('direction', type=str, required=True, help='Provide direction, Incoming or Outgoing')
+qosPolicyRuleParser.add_argument('max_kbps', type=int, help='Provide bandwidth limit in kbps')
+qosPolicyRuleParser.add_argument('max_burst_kbps', type=int, help='Provide burst limit in kbps')
 
 
 class qosPolicyDetail(Resource):
+    def post(self, name):
+        rule = qosPolicyRuleParser.parse_args()
+        if rule['action'] == 'add':
+            if 'max_burst_kbps' not in rule or 'max_kbps' not in rule:
+                abort(400, message='Define bw on action add')
+        return OSController.executeRuleOnPolicy(policy_name=name, rule=rule)
+
     def delete(self, name):
-        if OSController.deletePolicy(RULE_NAME_PREFIX + name):
-            return {'policy': RULE_NAME_PREFIX + name + "_policy deleted"}
+        if OSController.deletePolicy(name):
+            return {'policy': name + " deleted"}
         else:
             abort(400, message='Policy not found or failed to delete. It might be assigned to an IP. Delete assotiation first or fix your test case')
+
+
