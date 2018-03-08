@@ -112,7 +112,7 @@ class OpenStackController(object):
 
     def executeRuleOnPolicy(self, policy_name, rule):
         policyobj = self.getPolicy(policy_name)
-        rule['direction'] = 'egress' if rule['direction'] == 'incoming' else 'ingress'
+        rule['direction'] = 'ingress' if rule['direction'] == 'incoming' else 'egress'
 
         for obj in self.findRuleQuery(policy=policyobj, action_type=rule['type']):
             objdict = obj.to_dict()
