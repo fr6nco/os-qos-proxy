@@ -48,11 +48,6 @@ class qos(Resource):
         return OSController.listServers(filter_ip=None)
 
 
-qosDetailParser = reqparse.RequestParser()
-qosDetailParser.add_argument('policy', type=str, required=True, help='Please Define Policy name, osproxy_{name}_policy are prepended and appended automatically')
-qosDetailParser.add_argument('direction', type=str, required=False, help='Add direction if required')
-
-
 class qosDetail(Resource):
     def get(self, ip_address):
         return OSController.listServers(filter_ip=ip_address)
