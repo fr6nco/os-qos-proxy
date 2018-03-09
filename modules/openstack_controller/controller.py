@@ -1,7 +1,6 @@
 import openstack
 import re
 
-
 class OpenStackController(object):
     def __init__(self, modelname='openstack4'):
         self.conn = openstack.connect(cloud=modelname)
@@ -110,9 +109,14 @@ class OpenStackController(object):
                                                               max_burst_kbps=kwargs['max_burst_kbps'],
                                                               max_kbps=kwargs['max_kbps'])
 
-    def executeRuleOnPolicy(self, policy_name, rule):
+    def executeRuleOnPolicy(self, policy_name, rule, qos_context):
         policyobj = self.getPolicy(policy_name)
-        rule['direction'] = 'ingress' if rule['direction'] == 'incoming' else 'egress'
+        if qos_context == 'endpoint_context':
+            rule['direction'] = 'ingress' if rule['direction'] == 'incoming' else 'egress'
+        elif qos_context == 'switch_context':
+            rule['direction'] = 'egress' if rule['direction'] == 'incoming' else 'ingress'
+        else:
+            return None
 
         for obj in self.findRuleQuery(policy=policyobj, action_type=rule['type']):
             objdict = obj.to_dict()

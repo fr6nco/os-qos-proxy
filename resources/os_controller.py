@@ -1,6 +1,10 @@
 from flask_restful import fields, marshal, Resource, abort, reqparse
 from modules.openstack_controller.controller import OpenStackController
 
+import ConfigParser
+Config = ConfigParser.ConfigParser()
+Config.read('./config/config.conf')
+
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +44,7 @@ server_resource_fields = {
     'ports': fields.List(fields.Nested(port_resource_fields))
 }
 
-OSController = OpenStackController()
+OSController = OpenStackController(modelname=Config.get('api', 'cloud_name'))
 
 
 class qos(Resource):
@@ -80,7 +84,7 @@ class qosPolicyDetail(Resource):
         if rule['action'] == 'add':
             if 'max_burst_kbps' not in rule or 'max_kbps' not in rule:
                 abort(400, message='Define bw on action add')
-        return OSController.executeRuleOnPolicy(policy_name=name, rule=rule)
+        return OSController.executeRuleOnPolicy(policy_name=name, rule=rule, qos_context=Config.get("api", "qos_context"))
 
     def delete(self, name):
         if OSController.deletePolicy(name):

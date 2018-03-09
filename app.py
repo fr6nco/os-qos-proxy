@@ -1,6 +1,10 @@
 from flask import Flask
 from flask_restful import Api
-from gevent import monkey, wsgi
+from gevent import monkey
+
+import ConfigParser
+Config = ConfigParser.ConfigParser()
+Config.read('./config/config.conf')
 
 from resources.os_controller import qos, qosDetail, qosPolicy, qosPolicyDetail
 
@@ -23,5 +27,10 @@ api.add_resource(qosPolicyDetail, '/api/qos/policy/<string:name>')
 
 
 if __name__ == '__main__':
-    app.run(debug=False)
+
+    if Config.get('api', 'qos_context') not in ['switch_context', 'endpoint_context']:
+        print 'Bad context option, set to switch_context or endpoint_context in ./config/config.conf'
+        exit(1)
+
+    app.run(debug=False, host=Config.get("api", "listen"), port=int(Config.get("api", "port")))
 
