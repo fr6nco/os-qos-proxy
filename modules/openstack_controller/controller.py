@@ -75,19 +75,16 @@ class OpenStackController(object):
         return self.conn.network.find_qos_policy("osproxy_" + name + "_policy")
 
     def assignPolicyToServer(self, policy):
-        LOGGER.info('Setting policy to server')
-        LOGGER.info(policy)
+        LOGGER.debug('Setting policy to server')
+        LOGGER.debug(policy)
         qpolicy = self.conn.network.create_qos_policy(name="osproxy_" + policy['name'] + "_policy", description="Policy assigned to server "+policy['name']+", Orchestrated by OS proxy")
         qos = qpolicy.to_dict()
 
         for server in self.conn.compute.servers():
-            LOGGER.info(json.dumps(server.to_dict()))
             for interface in self.conn.compute.server_interfaces(server=server):
                 iface = interface.to_dict()
-                LOGGER.info(json.dumps(iface))
                 port = self.conn.network.get_port(iface['port_id'])
                 prt = port.to_dict()
-                LOGGER.info(json.dumps(prt))
                 for fixed_ip in prt['fixed_ips']:
                     if fixed_ip['ip_address'] == policy['ip']:
                         self.conn.network.update_port(port, qos_policy_id=qos['id'])
